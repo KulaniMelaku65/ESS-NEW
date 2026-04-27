@@ -1,0 +1,52 @@
+{
+  "id": "31880e59-6985-4af6-832a-d65cb9c7ea69",
+  "name": "ESSIntegration",
+  "publisher": "Default Publisher",
+  "version": "1.0.0.0",
+  "brief": "",
+  "description": "",
+  "privacyStatement": "",
+  "EULA": "",
+  "help": "",
+  "url": "",
+  "logo": "",
+  "dependencies": [
+    {
+      "id": "58b5eb2e-5a58-4e3a-a3f0-997bc00e85e8",
+      "name": "Fanisi_Finance",
+      "version": "1.0.0.1",
+      "publisher": "FanisiTech LTD"
+    },
+    {
+      "id": "130e75cf-80c9-4e6c-91b7-3560ec402c3c",
+      "name": "Fanisi_HR",
+      "version": "1.0.0.1",
+      "publisher": "FanisiTech LTD"
+    },
+    {
+      "id": "63603275-af84-4052-abb2-c655ef58466f",
+      "name": "Fanisi_Generl",
+      "version": "1.0.0.3",
+      "publisher": "FanisiTech LTD"
+    }    
+  ],
+  
+  "screenshots": [],
+  "platform": "1.0.0.0",
+  "application": "20.0.0.0",
+  "idRanges": [
+    {
+      "from": 51100,
+      "to": 51149
+    }
+  ],
+  "resourceExposurePolicy": {
+    "allowDebugging": true,
+    "allowDownloadingSource": true,
+    "includeSourceInSymbolFile": true
+  },
+  "runtime": "9.0",
+  "features": [
+    "NoImplicitWith"
+  ]
+}
