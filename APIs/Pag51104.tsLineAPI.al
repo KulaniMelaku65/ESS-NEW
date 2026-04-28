@@ -5,8 +5,8 @@ page 51104 tsLineAPI
     APIVersion = 'v1.0';
     Caption = 'Timesheet Lines API';
     DelayedInsert = true;
-    EntityName = 'TimesheetLine';
-    EntitySetName = 'TimesheetLines';
+    EntityName = 'TimesheetsLine';
+    EntitySetName = 'TimesheetsLines';
     PageType = API;
     SourceTable = "Monthly Timesheet Line";
     ODataKeyFields = "Document No.", "Line No.";

@@ -5,7 +5,7 @@ table 51101 "Monthly Timesheet Line"
 
     fields
     {
-        field(1; "Document No."; Code[20]) { TableRelation = "Monthly Timesheet Header"; }
+        field(1; "Document No."; Code[20]) { TableRelation = "Monthly Timesheet Header"."No."; }
         field(2; "Line No."; Integer) { }
         field(3; "Work Date"; Date) { }
         field(4; "Job No."; Code[20]) { TableRelation = Job; }

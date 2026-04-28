@@ -54,8 +54,8 @@ page 51102 tsHeaderAPI
             part(Lines; tsLineAPI)
             {
                 Caption = 'Lines';
-                EntityName = 'TimesheetLine';
-                EntitySetName = 'TimesheetLines';
+                EntityName = 'TimesheetsLine';
+                EntitySetName = 'TimesheetsLines';
                 SubPageLink = "Document No." = field("No.");
             }
         }
