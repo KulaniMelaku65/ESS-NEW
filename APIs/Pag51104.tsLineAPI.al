@@ -67,7 +67,7 @@ page 51104 tsLineAPI
         // Auto-calculate daily total and hours
         Rec."Daily Total" := Rec."Morning Hours" + Rec."Afternoon Hours";
         Rec.Hours := Rec."Daily Total";
-        exit(false);
+        exit(TRUE);
     end;
 
 
