@@ -61,4 +61,18 @@ page 51102 tsHeaderAPI
         }
     }
 
+    trigger OnInsertRecord(BelowxRec: Boolean): Boolean
+    var
+        tsHeader: Record "Monthly Timesheet Header";
+    begin
+        tsHeader.Reset();
+        tsHeader.SetRange("Employee No.", Rec."Employee No.");
+        tsHeader.SetRange(Month, Rec.Month);
+        tsHeader.SetRange(Year, Rec.Year);
+
+        if tsHeader.FindFirst() then
+            Error('Employee %1 already has a timesheet for %2 %3.',
+                  Rec."Employee No.", Rec.Month, Rec.Year);
+    end;
+
 }

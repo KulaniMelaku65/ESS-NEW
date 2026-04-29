@@ -7,7 +7,56 @@ table 51101 "Monthly Timesheet Line"
     {
         field(1; "Document No."; Code[20]) { TableRelation = "Monthly Timesheet Header"."No."; }
         field(2; "Line No."; Integer) { }
-        field(3; "Work Date"; Date) { }
+        //field(3; "Work Date"; Date) { }
+        field(3; "Work Date"; Date)
+        {
+            trigger OnValidate()
+            var
+                Header: Record "Monthly Timesheet Header";
+                workMonth: Integer;
+                workYear: Integer;
+                headerMonth: Integer;
+            begin
+                if Header.Get("Document No.") then begin
+                    workMonth := Date2DMY("Work Date", 2); // numeric month (1–12)
+                    workYear := Date2DMY("Work Date", 3);
+
+                    // Map option to integer month
+                    case Header.Month of
+                        Header.Month::January:
+                            headerMonth := 1;
+                        Header.Month::February:
+                            headerMonth := 2;
+                        Header.Month::March:
+                            headerMonth := 3;
+                        Header.Month::April:
+                            headerMonth := 4;
+                        Header.Month::May:
+                            headerMonth := 5;
+                        Header.Month::June:
+                            headerMonth := 6;
+                        Header.Month::July:
+                            headerMonth := 7;
+                        Header.Month::August:
+                            headerMonth := 8;
+                        Header.Month::September:
+                            headerMonth := 9;
+                        Header.Month::October:
+                            headerMonth := 10;
+                        Header.Month::November:
+                            headerMonth := 11;
+                        Header.Month::December:
+                            headerMonth := 12;
+                    end;
+
+                    if (workMonth <> headerMonth) or (workYear <> Header.Year) then
+                        Error(
+                          'Work Date %1 must be within %2 %3.',
+                          "Work Date", Format(Header.Month), Header.Year);
+                end;
+            end;
+        }
+
         field(4; "Job No."; Code[20]) { TableRelation = Job; }
         // --- Table Extension/Update: Timesheet Line ---
         field(5; "Hours"; Decimal)
