@@ -41,6 +41,14 @@ page 51104 tsLineAPI
                 {
                     Caption = 'Afternoon Hours';
                 }
+                field(activity; Rec.Activity)
+                {
+                    Caption = 'Activity';
+                }
+                field(Notes; Rec.Notes)
+                {
+                    Caption = 'Notes';
+                }
                 field(dailyTotal; Rec."Daily Total")
                 {
                     Caption = 'Total for Day';

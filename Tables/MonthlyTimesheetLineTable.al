@@ -24,7 +24,8 @@ table 51101 "Monthly Timesheet Line"
                     Message('Note: You are recording 0 hours for this entry.');
             end;
         }
-        field(6; "Description"; Text[100]) { }
+        field(6; "Activity"; Text[100]) { }
+        field(10; "Notes"; Text[100]) { }
         field(7; "Morning Hours"; Decimal)
         {
             MinValue = 0;
