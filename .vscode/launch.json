@@ -6,7 +6,7 @@
             "request": "launch",
             "type": "al",
             "environmentType": "OnPrem",
-            //"server":"https://10.253.99.143:8080/ERP",
+            //"server":"https://10.254.99.79:8080/ERP",  live server address
             
             "server": "http://10.254.99.79:8080/ERP",
             "serverInstance": "ERP",
