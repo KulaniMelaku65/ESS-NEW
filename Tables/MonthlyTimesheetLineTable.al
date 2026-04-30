@@ -104,17 +104,74 @@ table 51101 "Monthly Timesheet Line"
     }
 
     // Inside the Monthly Timesheet Line Table
+
     trigger OnInsert()
     var
         Header: Record "Monthly Timesheet Header";
+        tsLine: Record "Monthly Timesheet Line";
+        monthStart: Date;
+        monthEnd: Date;
+        lastDay: Integer;
+        lineCount: Integer;
+        headerMonthInt: Integer;
     begin
         if Header.Get(Rec."Document No.") then begin
-            // Ensure the date matches the header's month
-            if Date2DMY(Rec."Work Date", 2) <> Header.Month then
+            // --- Map Option Month to Integer ---
+            case Header.Month of
+                Header.Month::January:
+                    headerMonthInt := 1;
+                Header.Month::February:
+                    headerMonthInt := 2;
+                Header.Month::March:
+                    headerMonthInt := 3;
+                Header.Month::April:
+                    headerMonthInt := 4;
+                Header.Month::May:
+                    headerMonthInt := 5;
+                Header.Month::June:
+                    headerMonthInt := 6;
+                Header.Month::July:
+                    headerMonthInt := 7;
+                Header.Month::August:
+                    headerMonthInt := 8;
+                Header.Month::September:
+                    headerMonthInt := 9;
+                Header.Month::October:
+                    headerMonthInt := 10;
+                Header.Month::November:
+                    headerMonthInt := 11;
+                Header.Month::December:
+                    headerMonthInt := 12;
+            end;
+
+            // --- Validate Work Date belongs to header month/year ---
+            if Date2DMY(Rec."Work Date", 2) <> headerMonthInt then
                 Error('The Work Date must be within the month of %1.', Header.Month);
 
             if Date2DMY(Rec."Work Date", 3) <> Header.Year then
                 Error('The Work Date must be within the year %1.', Header.Year);
+
+            // --- Calculate last valid day of the month ---
+            monthStart := DMY2Date(1, headerMonthInt, Header.Year);
+            monthEnd := CalcDate('<CM>', monthStart); // end of current month
+            lastDay := Date2DMY(monthEnd, 1);         // day component (28–31)
+
+            // --- Count existing lines ---
+            tsLine.Reset();
+            tsLine.SetRange("Document No.", Rec."Document No.");
+            lineCount := tsLine.Count;
+
+            if lineCount >= lastDay then
+                Error(
+                  'Employee %1 already has %2 days entered for %3 %4. No more lines can be added.',
+                  Header."Employee No.", lastDay, Header.Month, Header.Year);
+
+            // --- Prevent duplicate Work Date ---
+            tsLine.Reset();
+            tsLine.SetRange("Document No.", Rec."Document No.");
+            tsLine.SetRange("Work Date", Rec."Work Date");
+            if tsLine.FindFirst() then
+                Error('Work Date %1 is already entered for this timesheet.', Rec."Work Date");
         end;
     end;
 
