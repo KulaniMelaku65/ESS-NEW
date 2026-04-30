@@ -6,8 +6,9 @@
             "request": "launch",
             "type": "al",
             "environmentType": "OnPrem",
-          "server": "https://enterprise.kifiya.dev/ERP",
-          //  "server": "http://10.254.99.79:8080/ERP",
+            //"server":"https://10.253.99.143:8080/ERP",
+            
+            "server": "http://10.254.99.79:8080/ERP",
             "serverInstance": "ERP",
             "port": 7049,
             "authentication": "UserPassword",
@@ -18,7 +19,7 @@
             "enableLongRunningSqlStatements": true,
             "enableSqlInformationDebugger": true,
             "tenant": "default",
-            "usePublicURLFromServer": true,
+            "usePublicURLFromServer": false,
             "schemaUpdateMode": "ForceSync"
         }
     ]
