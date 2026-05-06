@@ -62,7 +62,7 @@ page 51100 "Monthly Timesheet Card"
 
                 trigger OnAction()
                 var
-                    TSMgt: Codeunit "Timesheet Mgt.";
+                    TSMgt: Codeunit "Timesheet Workflow";
                 begin
                     TSMgt.CancelTimesheet(Rec);
                 end;
@@ -78,4 +78,5 @@ page 51100 "Monthly Timesheet Card"
         // The page is only editable if the status is Open
         PageEditable := Rec.Status = Rec.Status::Open;
     end;
+
 }
