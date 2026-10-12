@@ -1,0 +1,942 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <AutoRefresh>0</AutoRefresh>
+  <DataSources>
+    <DataSource Name="DataSource">
+      <ConnectionProperties>
+        <DataProvider>NAV</DataProvider>
+        <ConnectString>Database=NAV</ConnectString>
+      </ConnectionProperties>
+      <rd:SecurityType>None</rd:SecurityType>
+      <rd:DataSourceID>c46ab121-162c-46f2-897c-505c7f5f90f1</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+          <Textbox Name="Title">
+            <rd:DefaultName>Title</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Sales E-Receipt</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>16pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>0in</Top>
+            <Left>0in</Left>
+            <Height>0.3in</Height>
+            <Width>7.5in</Width>
+          </Textbox>
+          <Textbox Name="SellerName">
+            <rd:DefaultName>SellerName</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!SellerName_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>0.4in</Top>
+            <Left>0in</Left>
+            <Height>0.25in</Height>
+            <Width>4in</Width>
+          </Textbox>
+          <Textbox Name="SellerDetails">
+            <rd:DefaultName>SellerDetails</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>="TIN: " &amp; First(Fields!SellerTIN_.Value, "DataSet_Result") &amp; vbCrLf &amp; First(Fields!SellerAddress_.Value, "DataSet_Result") &amp; ", " &amp; First(Fields!SellerCity_.Value, "DataSet_Result") &amp; vbCrLf &amp; "Phone: " &amp; First(Fields!SellerPhoneNo_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>0.65in</Top>
+            <Left>0in</Left>
+            <Height>0.6in</Height>
+            <Width>4in</Width>
+          </Textbox>
+          <Textbox Name="DocInfo">
+            <rd:DefaultName>DocInfo</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>="Invoice No.: " &amp; First(Fields!DocumentNo_.Value, "DataSet_Result") &amp; vbCrLf &amp; "Date: " &amp; First(Fields!DocumentDate_.Value, "DataSet_Result") &amp; vbCrLf &amp; "Status: " &amp; First(Fields!Status_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <TextAlign>Right</TextAlign>
+            </Style>
+            <Top>0.4in</Top>
+            <Left>4.2in</Left>
+            <Height>0.6in</Height>
+            <Width>3.3in</Width>
+          </Textbox>
+          <Textbox Name="CustomerInfo">
+            <rd:DefaultName>CustomerInfo</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>="Bill To:" &amp; vbCrLf &amp; First(Fields!CustomerNo_.Value, "DataSet_Result") &amp; " - " &amp; First(Fields!CustomerName_.Value, "DataSet_Result") &amp; vbCrLf &amp; "TIN: " &amp; First(Fields!CustomerTIN_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>1.4in</Top>
+            <Left>0in</Left>
+            <Height>0.6in</Height>
+            <Width>4in</Width>
+          </Textbox>
+          <Textbox Name="FiscalInfo">
+            <rd:DefaultName>FiscalInfo</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>="IRN: " &amp; First(Fields!IRN_.Value, "DataSet_Result") &amp; vbCrLf &amp; "Fiscal Doc No.: " &amp; First(Fields!FiscalDocumentNo_.Value, "DataSet_Result") &amp; vbCrLf &amp; "Ack Date: " &amp; First(Fields!AckDate_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <TextAlign>Right</TextAlign>
+            </Style>
+            <Top>1.4in</Top>
+            <Left>4.2in</Left>
+            <Height>0.9in</Height>
+            <Width>3.3in</Width>
+          </Textbox>
+          <Tablix Name="LinesTablix">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>2.8in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>0.8in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>1.4in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>1.5in</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="HdrItemNo">
+                          <rd:DefaultName>HdrItemNo</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Item No.</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <BackgroundColor>#E3E9F2</BackgroundColor>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingTop>2pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="HdrDescription">
+                          <rd:DefaultName>HdrDescription</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Description</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <BackgroundColor>#E3E9F2</BackgroundColor>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingTop>2pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="HdrQty">
+                          <rd:DefaultName>HdrQty</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Qty</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Right</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <BackgroundColor>#E3E9F2</BackgroundColor>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="HdrUnitPrice">
+                          <rd:DefaultName>HdrUnitPrice</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Unit Price Excl. VAT</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Right</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <BackgroundColor>#E3E9F2</BackgroundColor>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="HdrAmount">
+                          <rd:DefaultName>HdrAmount</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Line Amount Excl. VAT</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Right</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <BackgroundColor>#E3E9F2</BackgroundColor>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.3in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="LineItemNo">
+                          <rd:DefaultName>LineItemNo</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!LineItemNo_.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingTop>1pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="LineDescription">
+                          <rd:DefaultName>LineDescription</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!LineDescription_.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingTop>1pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="LineQuantity">
+                          <rd:DefaultName>LineQuantity</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!LineQuantity_.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Right</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>1pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="LineUnitPrice">
+                          <rd:DefaultName>LineUnitPrice</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!LineUnitPrice_.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Right</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <Format>#,##0.00</Format>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>1pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="LineAmount">
+                          <rd:DefaultName>LineAmount</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!LineAmount_.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Right</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>Solid</Style>
+                              <Color>#3a4656</Color>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <Format>#,##0.00</Format>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>1pt</PaddingTop>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <KeepWithGroup>After</KeepWithGroup>
+                </TablixMember>
+                <TablixMember>
+                  <Group Name="Details" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <DataSetName>DataSet_Result</DataSetName>
+            <Top>2.5in</Top>
+            <Left>0in</Left>
+            <Height>0.6in</Height>
+            <Width>7.5in</Width>
+          </Tablix>
+          <Textbox Name="TotExclVatLbl">
+            <rd:DefaultName>TotExclVatLbl</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Total Excl. VAT (ETB)</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>3.4in</Top>
+            <Left>4.5in</Left>
+            <Height>0.25in</Height>
+            <Width>1.6in</Width>
+          </Textbox>
+          <Textbox Name="TotExclVatVal">
+            <rd:DefaultName>TotExclVatVal</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!TotalExclVAT_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Right</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <Format>#,##0.00</Format>
+            </Style>
+            <Top>3.4in</Top>
+            <Left>6.1in</Left>
+            <Height>0.25in</Height>
+            <Width>1.4in</Width>
+          </Textbox>
+          <Textbox Name="TotVatLbl">
+            <rd:DefaultName>TotVatLbl</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Total VAT (ETB)</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>3.65in</Top>
+            <Left>4.5in</Left>
+            <Height>0.25in</Height>
+            <Width>1.6in</Width>
+          </Textbox>
+          <Textbox Name="TotVatVal">
+            <rd:DefaultName>TotVatVal</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!TotalVAT_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Right</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <Format>#,##0.00</Format>
+            </Style>
+            <Top>3.65in</Top>
+            <Left>6.1in</Left>
+            <Height>0.25in</Height>
+            <Width>1.4in</Width>
+          </Textbox>
+          <Textbox Name="InvDiscLbl">
+            <rd:DefaultName>InvDiscLbl</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>="Inv. Discount (" &amp; Format(First(Fields!InvDiscPct_.Value, "DataSet_Result"), "N1") &amp; "%) Incl. VAT (ETB)"</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+            <Top>3.9in</Top>
+            <Left>4.5in</Left>
+            <Height>0.25in</Height>
+            <Width>1.6in</Width>
+          </Textbox>
+          <Textbox Name="InvDiscVal">
+            <rd:DefaultName>InvDiscVal</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!InvDiscAmtInclVAT_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>9pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Right</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <Format>#,##0.00</Format>
+            </Style>
+            <Top>3.9in</Top>
+            <Left>6.1in</Left>
+            <Height>0.25in</Height>
+            <Width>1.4in</Width>
+          </Textbox>
+          <Textbox Name="TotInclVatLbl">
+            <rd:DefaultName>TotInclVatLbl</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Total Incl. VAT (ETB)</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>10pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+                <TopStyle>Solid</TopStyle>
+                <TopColor>#3a4656</TopColor>
+                <TopWidth>0.75pt</TopWidth>
+              </Border>
+              <PaddingTop>2pt</PaddingTop>
+            </Style>
+            <Top>4.2in</Top>
+            <Left>4.5in</Left>
+            <Height>0.3in</Height>
+            <Width>1.6in</Width>
+          </Textbox>
+          <Textbox Name="TotInclVatVal">
+            <rd:DefaultName>TotInclVatVal</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!TotalInclVAT_.Value, "DataSet_Result")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>10pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Right</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Style>
+              <Border>
+                <Style>None</Style>
+                <TopStyle>Solid</TopStyle>
+                <TopColor>#3a4656</TopColor>
+                <TopWidth>0.75pt</TopWidth>
+              </Border>
+              <Format>#,##0.00</Format>
+              <PaddingTop>2pt</PaddingTop>
+            </Style>
+            <Top>4.2in</Top>
+            <Left>6.1in</Left>
+            <Height>0.3in</Height>
+            <Width>1.4in</Width>
+          </Textbox>
+          <Image Name="QRImage">
+            <rd:DefaultName>QRImage</rd:DefaultName>
+            <Source>Database</Source>
+            <Value>=First(Fields!QRImage_.Value, "DataSet_Result")</Value>
+            <MIMEType>image/png</MIMEType>
+            <Sizing>FitProportional</Sizing>
+            <Top>3.4in</Top>
+            <Left>0in</Left>
+            <Height>1.3in</Height>
+            <Width>1.3in</Width>
+          </Image>
+        </ReportItems>
+        <Height>4.8in</Height>
+      </Body>
+      <Width>7.5in</Width>
+      <Page>
+        <PageHeight>11in</PageHeight>
+        <PageWidth>8.5in</PageWidth>
+        <LeftMargin>0.5in</LeftMargin>
+        <RightMargin>0.5in</RightMargin>
+        <TopMargin>0.5in</TopMargin>
+        <BottomMargin>0.5in</BottomMargin>
+        <ColumnSpacing>0in</ColumnSpacing>
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <Width>7.5in</Width>
+  <Language>en-US</Language>
+  <DataSets>
+    <DataSet Name="DataSet_Result">
+      <Fields>
+        <Field Name="SellerName_">
+          <DataField>SellerName_</DataField>
+        </Field>
+        <Field Name="SellerTIN_">
+          <DataField>SellerTIN_</DataField>
+        </Field>
+        <Field Name="SellerAddress_">
+          <DataField>SellerAddress_</DataField>
+        </Field>
+        <Field Name="SellerCity_">
+          <DataField>SellerCity_</DataField>
+        </Field>
+        <Field Name="SellerPhoneNo_">
+          <DataField>SellerPhoneNo_</DataField>
+        </Field>
+        <Field Name="CustomerNo_">
+          <DataField>CustomerNo_</DataField>
+        </Field>
+        <Field Name="CustomerName_">
+          <DataField>CustomerName_</DataField>
+        </Field>
+        <Field Name="CustomerTIN_">
+          <DataField>CustomerTIN_</DataField>
+        </Field>
+        <Field Name="DocumentNo_">
+          <DataField>DocumentNo_</DataField>
+        </Field>
+        <Field Name="DocumentDate_">
+          <DataField>DocumentDate_</DataField>
+        </Field>
+        <Field Name="IRN_">
+          <DataField>IRN_</DataField>
+        </Field>
+        <Field Name="AckDate_">
+          <DataField>AckDate_</DataField>
+        </Field>
+        <Field Name="Status_">
+          <DataField>Status_</DataField>
+        </Field>
+        <Field Name="FiscalDocumentNo_">
+          <DataField>FiscalDocumentNo_</DataField>
+        </Field>
+        <Field Name="QRImage_">
+          <DataField>QRImage_</DataField>
+        </Field>
+        <Field Name="TotalExclVAT_">
+          <DataField>TotalExclVAT_</DataField>
+        </Field>
+        <Field Name="TotalExclVAT_Format">
+          <DataField>TotalExclVAT_Format</DataField>
+        </Field>
+        <Field Name="TotalVAT_">
+          <DataField>TotalVAT_</DataField>
+        </Field>
+        <Field Name="TotalVAT_Format">
+          <DataField>TotalVAT_Format</DataField>
+        </Field>
+        <Field Name="TotalInclVAT_">
+          <DataField>TotalInclVAT_</DataField>
+        </Field>
+        <Field Name="TotalInclVAT_Format">
+          <DataField>TotalInclVAT_Format</DataField>
+        </Field>
+        <Field Name="InvDiscAmtInclVAT_">
+          <DataField>InvDiscAmtInclVAT_</DataField>
+        </Field>
+        <Field Name="InvDiscAmtInclVAT_Format">
+          <DataField>InvDiscAmtInclVAT_Format</DataField>
+        </Field>
+        <Field Name="InvDiscPct_">
+          <DataField>InvDiscPct_</DataField>
+        </Field>
+        <Field Name="InvDiscPct_Format">
+          <DataField>InvDiscPct_Format</DataField>
+        </Field>
+        <Field Name="LineItemNo_">
+          <DataField>LineItemNo_</DataField>
+        </Field>
+        <Field Name="LineDescription_">
+          <DataField>LineDescription_</DataField>
+        </Field>
+        <Field Name="LineQuantity_">
+          <DataField>LineQuantity_</DataField>
+        </Field>
+        <Field Name="LineQuantity_Format">
+          <DataField>LineQuantity_Format</DataField>
+        </Field>
+        <Field Name="LineUnitPrice_">
+          <DataField>LineUnitPrice_</DataField>
+        </Field>
+        <Field Name="LineUnitPrice_Format">
+          <DataField>LineUnitPrice_Format</DataField>
+        </Field>
+        <Field Name="LineAmount_">
+          <DataField>LineAmount_</DataField>
+        </Field>
+        <Field Name="LineAmount_Format">
+          <DataField>LineAmount_Format</DataField>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>DataSource</DataSourceName>
+        <CommandText />
+      </Query>
+    </DataSet>
+  </DataSets>
+</Report>
