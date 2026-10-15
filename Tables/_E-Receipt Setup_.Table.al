@@ -36,11 +36,16 @@ table 51104 "E-Receipt Setup"
         field(20; "Next Receipt Counter"; Integer)
         {
             Caption = 'Next Receipt Counter';
-            // "receiptCounter" must increase by exactly one for each receipt sent to
-            // the middleware — this is that running counter, incremented atomically
-            // (see codeunit 51105's GetNextReceiptCounter). Starts at 1 for a brand-new
-            // system registration; set this manually if the middleware team registers
-            // this system starting from a different number.
+            // ONE shared sequence across every receipt-generating call this system
+            // makes — the invoice's own payment receipt, credit-sale receipts
+            // (POST /v1/receipts/sales), and withholding receipts (POST /v1/receipts/
+            // withholding) all draw from this SAME counter, confirmed by the guide's own
+            // examples (123, then 124 for a credit-sale receipt, then 125 for a
+            // withholding receipt — strictly sequential across different call types, not
+            // separate per-type counters). Incremented atomically (see codeunit 51105's
+            // GetNextReceiptCounter). Starts at 1 for a brand-new system registration; set
+            // this manually if the middleware team registers this system starting from a
+            // different number.
             InitValue = 1;
             MinValue = 1;
         }

@@ -10,6 +10,14 @@ pageextension 51109 "Sales Invoice Page Ext" extends "Sales Invoice"
                 ToolTip = 'Specifies the customer''s Tax Identification Number (TIN), filled in automatically from the customer card when the customer is selected.';
             }
         }
+        addlast(content)
+        {
+            field("Withholding Amount"; Rec."Total Withholding Amount")
+            {
+                ApplicationArea = All;
+                ToolTip = 'Specifies the sum of all lines'' Withholding Amount — the lines where "Apply Withholding" is ticked.';
+            }
+        }
     }
     actions
     {

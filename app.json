@@ -28,12 +28,12 @@
       "name": "Fanisi_Generl",
       "version": "1.0.0.3",
       "publisher": "FanisiTech LTD"
-    }    
+    }
   ],
-  
   "screenshots": [],
-  "platform": "1.0.0.0",
+  "platform": "20.0.41086.41354",
   "application": "20.0.0.0",
+  "target": "Cloud",
   "idRanges": [
     {
       "from": 51100,

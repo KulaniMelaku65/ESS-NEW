@@ -55,6 +55,21 @@ codeunit 51105 "Sales E-Receipt API"
     // briefly before giving up and telling the user it's still pending. "Open printable
     // receipt" (a separate action) builds .../v1/invoices/{id}/print the same way, using
     // "E-Receipt Invoice ID" captured once the invoice registers.
+    //
+    // Withholding (per the guide's "Withholding" section): chosen on a per-line basis on
+    // the Sales Line itself ("Apply Withholding" + "Withholding Code", see TableExt
+    // "Sales Line Withholding" and table "Withholding Setup"), never automatic by
+    // customer. Income withholding (not transaction) per instruction — sent as
+    // values.incomeWithholdValue on the issue payload (BuildPayload), then filed
+    // separately via POST /v1/receipts/withholding (SubmitWithholdingReceipt, type
+    // "IWHT" — the guide's own example only shows "TWHT"; "IWHT" is this codeunit's
+    // extrapolation for the income-withholding counterpart, not independently
+    // confirmed). Its receiptCounter is the SAME shared sequence as every other
+    // receipt-generating call (GetNextReceiptCounter) — confirmed by the guide's own
+    // examples showing 123/124/125 used sequentially across an issue call, a
+    // credit-sale receipt, and a withholding receipt, not separate per-type counters.
+    // Basis is each line's pre-tax Amount, matching the receipt payload's own
+    // "preTaxAmount" field name.
 
     // Fetches MoR's own print DATA (confirmed via a real Postman test: GET with X-API-Key,
     // no forced Accept header, returns 200 JSON — not HTML/PDF as earlier assumed) and
@@ -117,7 +132,15 @@ codeunit 51105 "Sales E-Receipt API"
         if SalesHeader."E-Receipt Counter" = 0 then
             SalesHeader."E-Receipt Counter" := EReceiptSetup.GetNextReceiptCounter();
         SalesHeader.Modify();
-        ClientReference := CopyStr(StrSubstNo('%1-%2', SalesHeader."No.", SalesHeader."E-Receipt Attempt No."), 1, MaxStrLen(ClientReference));
+        // Bare document number on the normal/first attempt — only a genuine retry after a
+        // rejection (attempt > 1) needs the "-<attempt>" suffix, to avoid colliding with
+        // the previous (refused) attempt's own clientReference. Keeps what MoR echoes back
+        // (and what shows on its own printed receipt as "Trans. ID") clean in the common
+        // case instead of always showing "-1".
+        if SalesHeader."E-Receipt Attempt No." <= 1 then
+            ClientReference := SalesHeader."No."
+        else
+            ClientReference := CopyStr(StrSubstNo('%1-%2', SalesHeader."No.", SalesHeader."E-Receipt Attempt No."), 1, MaxStrLen(ClientReference));
 
         PopulateReceiptData(SalesHeader, ClientReference, EReceiptBuffer);
 
@@ -160,8 +183,26 @@ codeunit 51105 "Sales E-Receipt API"
             exit;
         end;
 
+        // A 422 has TWO different shapes per the guide: a genuine MoR REJECTED invoice
+        // (has "data.invoice.errors", handled by HandleResponse below) and a validation
+        // failure caught before MoR ever saw it — totals-mismatch, date-out-of-range —
+        // which uses the generic error shape {traceId, code, title, message, errors} with
+        // NO "data" field at all. Caught here first so that second shape shows its real
+        // reason instead of HandleResponse's generic "no data field" message.
+        if (StatusCode = 422) and not HasDataField(ResponseText) then begin
+            StartNewAttempt(SalesHeader);
+            Message('E-receipt service rejected the request before it reached MoR (HTTP 422).\n%1', FormatGenericError(ResponseText));
+            exit;
+        end;
+
         if not HandleResponse(SalesHeader, EReceiptBuffer, ResponseText) then
             exit;
+
+        // Per the guide's Withholding section: file the withholding receipt against the
+        // IRN before printing, so the printed invoice reflects the net payable.
+        EReceiptBuffer.Reset();
+        if EReceiptBuffer.FindFirst() and (EReceiptBuffer."Total Withholding Amount" > 0) then
+            SubmitWithholdingReceipt(EReceiptSetup, Client, EReceiptBuffer);
 
         if FetchAndDownloadPdf(EReceiptSetup, Client, SalesHeader."E-Receipt Invoice ID", SalesHeader."No.") then
             exit;
@@ -203,8 +244,10 @@ codeunit 51105 "Sales E-Receipt API"
         DataJson := JTok.AsObject();
         if not DataJson.Get('invoice', JTok) then exit(false);
         InvoiceJson := JTok.AsObject();
-        if InvoiceJson.Get('id', JTok) and not JTok.AsValue().IsNull() then
-            InvoiceId := JTok.AsValue().AsText();
+        if InvoiceJson.Get('id', JTok) then
+            if JTok.IsValue() then
+                if not JTok.AsValue().IsNull() then
+                    InvoiceId := JTok.AsValue().AsText();
         if InvoiceId = '' then exit(false);
         SelfUrl := EReceiptSetup."Base URL" + '/v1/invoices/' + InvoiceId;
 
@@ -219,7 +262,7 @@ codeunit 51105 "Sales E-Receipt API"
             StatusText := '';
             if DataJson.Get('invoice', JTok) then begin
                 InvoiceJson := JTok.AsObject();
-                if InvoiceJson.Get('status', JTok) then
+                if InvoiceJson.Get('status', JTok) and JTok.IsValue() then
                     StatusText := JTok.AsValue().AsText();
             end;
             case StatusText of
@@ -241,6 +284,8 @@ codeunit 51105 "Sales E-Receipt API"
         Customer: Record Customer;
         CompanyInfo: Record "Company Information";
         SalesLine: Record "Sales Line";
+        Item: Record Item;
+        ExciseSetupRec: Record "Excise Setup";
         LineNo: Integer;
         TotalExclVat: Decimal;
         TotalInclVat: Decimal;
@@ -250,6 +295,12 @@ codeunit 51105 "Sales E-Receipt API"
         InvoiceDiscountPct: Decimal;
         UnitPriceExclVat: Decimal;
         LineDiscount: Decimal;
+        TotalWithheldPreTax: Decimal;
+        TotalWithholding: Decimal;
+        LineWithholdingAmount: Decimal;
+        LineExcisePct: Decimal;
+        LineExciseAmount: Decimal;
+        TotalExciseAmount: Decimal;
         CustomerTin: Text[40];
         CustomerVatRegNo: Text[20];
         CustomerPhoneNo: Text[30];
@@ -294,12 +345,15 @@ codeunit 51105 "Sales E-Receipt API"
             SellerPhoneNo := CompanyInfo."Phone No.";
         end;
 
-        // Every real line (Item, Resource, G/L Account — not just Item), matching what
-        // MoR's gateway actually totals against; a blank-type/zero-quantity line (comment
-        // lines, etc.) is never a real sale line.
+        // Every real line (Item, Resource — not just Item), matching what MoR's gateway
+        // actually totals against; a blank-type/zero-quantity line (comment lines, etc.)
+        // is never a real sale line. G/L Account lines are EXCLUDED too — in this
+        // business's existing flow those are used to manually book withholding, which is
+        // now handled properly via "Apply Withholding" on the real item/service lines, so
+        // sending them to MoR as if they were sold items would double things up.
         SalesLine.SetRange("Document Type", SalesHeader."Document Type");
         SalesLine.SetRange("Document No.", SalesHeader."No.");
-        SalesLine.SetFilter(Type, '<>%1', SalesLine.Type::" ");
+        SalesLine.SetFilter(Type, '<>%1&<>%2', SalesLine.Type::" ", SalesLine.Type::"G/L Account");
         SalesLine.SetFilter(Quantity, '<>%1', 0);
         if SalesLine.FindSet() then
             repeat
@@ -314,6 +368,19 @@ codeunit 51105 "Sales E-Receipt API"
                     UnitPriceExclVat := Round(SalesLine.Amount / SalesLine.Quantity, 0.00001, '>');
                     LineDiscount := SalesLine.Quantity * UnitPriceExclVat - SalesLine.Amount;
                 end;
+
+                // Excise, per the EIMS tax calc reference: calculated on the FULL
+                // pre-discount Line Total (Quantity x Unit Price excl. VAT) — discounts
+                // never reduce the excise base. Looked up live from the Item's own
+                // "Excise Code" rather than trusted from any stored Sales Line field, so
+                // there's nothing here that can go stale the way "Withholding Amount" did.
+                LineExcisePct := 0;
+                if SalesLine.Type = SalesLine.Type::Item then
+                    if Item.Get(SalesLine."No.") and (Item."Excise Code" <> '') then
+                        if ExciseSetupRec.Get(Item."Excise Code") then
+                            LineExcisePct := ExciseSetupRec."Excise %";
+                LineExciseAmount := Round(SalesLine.Quantity * UnitPriceExclVat * LineExcisePct / 100, 0.01);
+                TotalExciseAmount += LineExciseAmount;
 
                 LineNo += 1;
                 EReceiptBuffer.Init();
@@ -346,6 +413,26 @@ codeunit 51105 "Sales E-Receipt API"
                 EReceiptBuffer."Line Discount Amount" := LineDiscount;
                 EReceiptBuffer."Line VAT %" := SalesLine."VAT %";
                 EReceiptBuffer."Line Amount Incl. VAT" := SalesLine."Amount Including VAT";
+                // Recomputed here rather than trusted from the stored "Withholding Amount"
+                // field: that field only gets refreshed by the OnValidate triggers on this
+                // table's own withholding fields and by codeunit 51109's subscriber on
+                // UpdateAmounts, so it can still go stale for a line whose withholding was
+                // applied before this codeunit existed, or set by anything else that moves
+                // Amount without re-raising those events. Recalculating from the CURRENT
+                // Amount at send-time guarantees what's sent always matches MoR's own
+                // expectation, independent of whatever state the stored field is in.
+                if SalesLine."Apply Withholding" then
+                    LineWithholdingAmount := Round(SalesLine.Amount * SalesLine."Withholding %" / 100, 0.01)
+                else
+                    LineWithholdingAmount := 0;
+                EReceiptBuffer."Line Withholding %" := SalesLine."Withholding %";
+                EReceiptBuffer."Line Withholding Amount" := LineWithholdingAmount;
+                EReceiptBuffer."Line Excise %" := LineExcisePct;
+                EReceiptBuffer."Line Excise Amount" := LineExciseAmount;
+                if SalesLine."Apply Withholding" then begin
+                    TotalWithheldPreTax += SalesLine.Amount;
+                    TotalWithholding += LineWithholdingAmount;
+                end;
                 EReceiptBuffer.Insert();
             until SalesLine.Next() = 0;
 
@@ -374,6 +461,22 @@ codeunit 51105 "Sales E-Receipt API"
             EReceiptBuffer."Invoice Discount %" := InvoiceDiscountPct;
             EReceiptBuffer.Insert();
         end;
+
+        // Both totals are only known once the loop above finishes, so they're stamped on
+        // afterward — same reason "Receipt Number"/"Receipt Counter" get a second pass in
+        // BuildPayload rather than being known inline. Computed from the SAME filtered
+        // line set actually sent as items[] (Item/Resource, not G/L Account) rather than
+        // Sales Header's own "Total Withholding Amount" FlowField, which sums ALL Sales
+        // Lines regardless of type — keeps "preTaxAmount" and "withholdingAmount" (sent
+        // together to MoR) always consistent with each other and with what was sent.
+        EReceiptBuffer.Reset();
+        if EReceiptBuffer.FindSet(true) then
+            repeat
+                EReceiptBuffer."Total Withheld PreTax Amount" := TotalWithheldPreTax;
+                EReceiptBuffer."Total Withholding Amount" := TotalWithholding;
+                EReceiptBuffer."Total Excise Amount" := TotalExciseAmount;
+                EReceiptBuffer.Modify();
+            until EReceiptBuffer.Next() = 0;
     end;
 
     // MoR/EIMS rejects an invoice whose natureOfSupplies doesn't match what it expects
@@ -381,8 +484,10 @@ codeunit 51105 "Sales E-Receipt API"
     // after assuming every Item-type Sales Line was 'goods'. For an Item line the real
     // signal is the Item's own Type (Service -> service; Inventory/Non-Inventory ->
     // goods), not the Sales Line Type (which only tells you it's an Item, not what kind).
-    // Resource and G/L Account lines are never physical goods, so those are 'service'
-    // outright.
+    // Resource lines are never physical goods, so those are 'service' outright. (G/L
+    // Account lines never reach here at all — PopulateReceiptData excludes them before
+    // this is ever called, since this business uses them for manually booking
+    // withholding, not as sold items.)
     local procedure LineNatureOfSupplies(SalesLine: Record "Sales Line"): Text[10]
     var
         Item: Record Item;
@@ -391,7 +496,7 @@ codeunit 51105 "Sales E-Receipt API"
             SalesLine.Type::Item:
                 if Item.Get(SalesLine."No.") and (Item.Type = Item.Type::Service) then
                     exit('service');
-            SalesLine.Type::Resource, SalesLine.Type::"G/L Account":
+            SalesLine.Type::Resource:
                 exit('service');
         end;
         exit('goods');
@@ -427,6 +532,18 @@ codeunit 51105 "Sales E-Receipt API"
         end;
     end;
 
+    // The BC user actually logged in and clicking "Print e-receipt" — their Full Name from
+    // the User table when set (a real person's name, e.g. "Kulani Melaku"), falling back
+    // to the raw login ID (UserId()) if Full Name was never filled in for that user.
+    local procedure CurrentUserDisplayName(): Text
+    var
+        UserRec: Record User;
+    begin
+        if UserRec.Get(UserSecurityId()) and (UserRec."Full Name" <> '') then
+            exit(UserRec."Full Name");
+        exit(UserId());
+    end;
+
     local procedure BuildPayload(var EReceiptBuffer: Record "E-Receipt Buffer" temporary; EReceiptSetup: Record "E-Receipt Setup"; ReceiptCounter: Integer): JsonObject
     var
         Root: JsonObject;
@@ -443,12 +560,17 @@ codeunit 51105 "Sales E-Receipt API"
         ReceiptNumberText: Text[30];
         VatPctInt: Integer;
         LineTaxAmount: Decimal;
+        ExciseVatAmount: Decimal;
+        LineTotalAmount: Decimal;
         SumTotal: Decimal;
         SumTax: Decimal;
+        CashierNameText: Text[50];
     begin
         EReceiptBuffer.Reset();
         if not EReceiptBuffer.FindSet() then
             exit(Root);
+
+        CashierNameText := CopyStr(CurrentUserDisplayName(), 1, MaxStrLen(CashierNameText));
 
         if EReceiptBuffer."Customer TIN" <> '' then
             TransactionTypeText := 'B2B'
@@ -470,7 +592,13 @@ codeunit 51105 "Sales E-Receipt API"
         repeat
             LineNo += 1;
             VatPctInt := Round(EReceiptBuffer."Line VAT %", 1);
-            LineTaxAmount := EReceiptBuffer."Line Amount Incl. VAT" - EReceiptBuffer."Line Amount";
+            // Base VAT-on-net calc is untouched (still BC's own "Amount Including VAT" -
+            // "Amount", so a non-excisable line computes byte-for-byte as before); the
+            // EIMS tax calc reference additionally taxes the excise amount itself, so that
+            // portion is added on top. Both are 0 when "Line Excise Amount" is 0.
+            ExciseVatAmount := Round(EReceiptBuffer."Line Excise Amount" * EReceiptBuffer."Line VAT %" / 100, 0.01);
+            LineTaxAmount := (EReceiptBuffer."Line Amount Incl. VAT" - EReceiptBuffer."Line Amount") + ExciseVatAmount;
+            LineTotalAmount := EReceiptBuffer."Line Amount" + EReceiptBuffer."Line Excise Amount" + LineTaxAmount;
 
             Clear(ItemObj);
             ItemObj.Add('lineNumber', LineNo);
@@ -482,13 +610,13 @@ codeunit 51105 "Sales E-Receipt API"
             ItemObj.Add('unitPrice', EReceiptBuffer."Line Unit Price");
             ItemObj.Add('discount', EReceiptBuffer."Line Discount Amount");
             ItemObj.Add('preTaxValue', EReceiptBuffer."Line Amount");
-            ItemObj.Add('exciseTaxValue', 0);
+            ItemObj.Add('exciseTaxValue', EReceiptBuffer."Line Excise Amount");
             ItemObj.Add('taxCode', StrSubstNo('VAT%1', VatPctInt));
             ItemObj.Add('taxAmount', LineTaxAmount);
-            ItemObj.Add('totalLineAmount', EReceiptBuffer."Line Amount Incl. VAT");
+            ItemObj.Add('totalLineAmount', LineTotalAmount);
             ItemsArr.Add(ItemObj);
 
-            SumTotal += EReceiptBuffer."Line Amount Incl. VAT";
+            SumTotal += LineTotalAmount;
             SumTax += LineTaxAmount;
         until EReceiptBuffer.Next() = 0;
 
@@ -502,10 +630,19 @@ codeunit 51105 "Sales E-Receipt API"
         ValuesObj.Add('taxValue', SumTax);
         ValuesObj.Add('currency', 'ETB');
 
+        // "When the buyer is a withholding agent, put the withheld amount on the invoice"
+        // (guide's Withholding section) — chosen as income withholding (incomeWithholdValue
+        // / type "IWHT" on the follow-up receipt call) per instruction. Omitted entirely
+        // when nothing on the invoice has withholding applied, rather than sending a 0.
+        EReceiptBuffer.FindFirst();
+        if EReceiptBuffer."Total Withholding Amount" > 0 then
+            ValuesObj.Add('incomeWithholdValue', EReceiptBuffer."Total Withholding Amount");
+
         InvoiceObj.Add('systemNumber', EReceiptSetup."System Number");
         InvoiceObj.Add('clientReference', EReceiptBuffer."Document No.");
         InvoiceObj.Add('transactionType', TransactionTypeText);
         InvoiceObj.Add('documentType', 'INV');
+        InvoiceObj.Add('cashierName', CashierNameText);
         InvoiceObj.Add('buyer', BuyerObj);
         InvoiceObj.Add('items', ItemsArr);
         InvoiceObj.Add('payment', InvPaymentObj);
@@ -515,7 +652,7 @@ codeunit 51105 "Sales E-Receipt API"
         ReceiptNumberText := CopyStr(StrSubstNo('%1-R%2', EReceiptBuffer."Document No.", ReceiptCounter), 1, 30);
 
         TxnObj.Add('modeOfPayment', 'CASH');
-        TxnObj.Add('collectorName', CopyStr(UserId(), 1, 50));
+        TxnObj.Add('collectorName', CashierNameText);
 
         TopPaymentObj.Add('receiptNumber', ReceiptNumberText);
         TopPaymentObj.Add('receiptCounter', Format(ReceiptCounter));
@@ -563,10 +700,26 @@ codeunit 51105 "Sales E-Receipt API"
         end;
         InvoiceJson := JTok.AsObject();
 
-        if InvoiceJson.Get('status', JTok) then
+        if InvoiceJson.Get('status', JTok) and JTok.IsValue() then
             StatusText := JTok.AsValue().AsText();
-        if InvoiceJson.Get('errorMessage', JTok) and not JTok.AsValue().IsNull() then
-            ErrorMessageText := JTok.AsValue().AsText();
+        // "errorMessage" crashed here on a real REJECTED response: it wasn't the plain
+        // string/null this was written for, so AsValue() (unguarded) threw "Unable to
+        // convert ... NavJsonToken to NavJsonValue." Guarded now, with an object/array
+        // shape dumped as raw JSON rather than silently dropped.
+        if InvoiceJson.Get('errorMessage', JTok) then
+            if JTok.IsValue() then begin
+                if not JTok.AsValue().IsNull() then
+                    ErrorMessageText := JTok.AsValue().AsText();
+            end else
+                JTok.WriteTo(ErrorMessageText);
+        ErrorMessageText += FormatInvoiceErrors(InvoiceJson);
+
+        // A real REJECTED response seen from this service had "errorMessage" as null
+        // AND no usable content in "errors" either — the old code showed a blank error,
+        // which read as "Nothing was attached" with no clue why. Falling back to the raw
+        // invoice JSON means a genuine rejection always shows SOMETHING to act on.
+        if (ErrorMessageText = '') and (StatusText <> 'REGISTERED') and (StatusText <> '') then
+            InvoiceJson.WriteTo(ErrorMessageText);
 
         if (StatusText <> 'REGISTERED') or (ErrorMessageText <> '') then begin
             // A genuine refusal — per the guide, fix the data and send as a new sale with
@@ -585,8 +738,10 @@ codeunit 51105 "Sales E-Receipt API"
         // rejected-invoice response (ackAt).
         IRNText := CopyStr(GetJsonText(InvoiceJson, 'irn'), 1, MaxStrLen(IRNText));
         AckDateText := CopyStr(GetJsonTextAny(InvoiceJson, 'ackDate', 'ackAt'), 1, MaxStrLen(AckDateText));
-        if InvoiceJson.Get('documentNumber', JTok) and not JTok.AsValue().IsNull() then
-            FiscalDocNoText := CopyStr(Format(JTok.AsValue()), 1, MaxStrLen(FiscalDocNoText));
+        if InvoiceJson.Get('documentNumber', JTok) then
+            if JTok.IsValue() then
+                if not JTok.AsValue().IsNull() then
+                    FiscalDocNoText := CopyStr(Format(JTok.AsValue()), 1, MaxStrLen(FiscalDocNoText));
 
         // Kept for "Open printable receipt" (a separate action, run independently of this
         // call) to build .../v1/invoices/{id}/print on its own.
@@ -613,6 +768,159 @@ codeunit 51105 "Sales E-Receipt API"
         exit(true);
     end;
 
+    // POST /v1/receipts/withholding, per the guide's Withholding section: a SEPARATE call
+    // from the invoice issue, filed against the already-registered invoice's own IRN, with
+    // its own receiptNumber/receiptCounter sequence (not the invoice's own receipt
+    // counter). Failure here doesn't roll back the invoice registration itself — it's
+    // already filed with MoR by this point — so this only messages the user rather than
+    // exiting the whole SendEReceipt flow.
+    local procedure SubmitWithholdingReceipt(EReceiptSetup: Record "E-Receipt Setup"; var Client: HttpClient; var EReceiptBuffer: Record "E-Receipt Buffer" temporary)
+    var
+        Content: HttpContent;
+        ContentHeaders: HttpHeaders;
+        Response: HttpResponseMessage;
+        ResponseText: Text;
+        Payload: JsonObject;
+        PayloadText: Text;
+        Url: Text;
+        ReceiptCounter: Integer;
+        ReceiptNumberText: Text[30];
+    begin
+        // Shares the SAME counter sequence as the invoice's own receipt and any
+        // credit-sale receipts — confirmed by the guide's own examples (123, 124, 125
+        // used sequentially across an issue call, a credit-sale receipt, and a
+        // withholding receipt). NOT a separate per-type counter.
+        ReceiptCounter := EReceiptSetup.GetNextReceiptCounter();
+        ReceiptNumberText := CopyStr(StrSubstNo('WHT-%1-%2', EReceiptBuffer."Document No.", ReceiptCounter), 1, 30);
+
+        Payload.Add('receiptNumber', ReceiptNumberText);
+        Payload.Add('receiptCounter', Format(ReceiptCounter));
+        Payload.Add('reason', CopyStr(StrSubstNo('Withholding on %1', EReceiptBuffer."Document No."), 1, 100));
+        Payload.Add('sourceSystemType', EReceiptSetup."System Type");
+        Payload.Add('sourceSystemNumber', EReceiptSetup."System Number");
+        Payload.Add('irn', EReceiptBuffer.IRN);
+        Payload.Add('currency', 'ETB');
+        Payload.Add('type', 'IWHT');
+        Payload.Add('preTaxAmount', EReceiptBuffer."Total Withheld PreTax Amount");
+        Payload.Add('withholdingAmount', EReceiptBuffer."Total Withholding Amount");
+        Payload.WriteTo(PayloadText);
+
+        Content.WriteFrom(PayloadText);
+        Content.GetHeaders(ContentHeaders);
+        ContentHeaders.Clear();
+        ContentHeaders.Add('Content-Type', 'application/json');
+
+        if not Client.DefaultRequestHeaders().Contains('X-API-Key') then
+            Client.DefaultRequestHeaders().Add('X-API-Key', EReceiptSetup."API Key");
+
+        Url := EReceiptSetup."Base URL" + '/v1/receipts/withholding';
+        if not Client.Post(Url, Content, Response) then begin
+            Message('Invoice %1 is registered, but the withholding receipt could not be submitted (network/timeout).', EReceiptBuffer."Document No.");
+            exit;
+        end;
+        Response.Content().ReadAs(ResponseText);
+        if not Response.IsSuccessStatusCode() then
+            // Same generic error envelope as the issue call's own 422 (traceId/code/title/
+            // message/errors) — formatted readably instead of dumping the raw JSON.
+            Message('Invoice %1 is registered, but the withholding receipt returned HTTP %2.\n%3', EReceiptBuffer."Document No.", Response.HttpStatusCode(), FormatGenericError(ResponseText));
+    end;
+
+    local procedure HasDataField(ResponseText: Text): Boolean
+    var
+        ResponseJson: JsonObject;
+        JTok: JsonToken;
+    begin
+        exit(ResponseJson.ReadFrom(ResponseText) and ResponseJson.Get('data', JTok));
+    end;
+
+    // Formats the guide's generic error shape ({traceId, code, title, message, errors?,
+    // status, timestamp}) into something readable, instead of dumping the raw JSON —
+    // used for a 422/400/etc. that was refused before MoR ever saw the invoice.
+    local procedure FormatGenericError(ResponseText: Text): Text
+    var
+        ResponseJson: JsonObject;
+        ErrorObj: JsonObject;
+        JTok: JsonToken;
+        ErrorElement: JsonToken;
+        ResultText: Text;
+        TitleText: Text;
+        MessageText: Text;
+    begin
+        if not ResponseJson.ReadFrom(ResponseText) then
+            exit('(response was not valid JSON)');
+
+        TitleText := GetJsonText(ResponseJson, 'title');
+        MessageText := GetJsonText(ResponseJson, 'message');
+        if (TitleText <> '') and (MessageText <> '') then
+            ResultText := StrSubstNo('%1: %2', TitleText, MessageText)
+        else
+            ResultText := TitleText + MessageText;
+
+        if ResponseJson.Get('errors', JTok) and JTok.IsArray() then
+            foreach ErrorElement in JTok.AsArray() do
+                if ErrorElement.IsObject() then begin
+                    ErrorObj := ErrorElement.AsObject();
+                    ResultText += StrSubstNo('\n- %1: %2', GetJsonText(ErrorObj, 'location'), GetJsonText(ErrorObj, 'message'));
+                end;
+
+        exit(ResultText);
+    end;
+
+    // "data.invoice.errors" (a genuine REJECTED invoice) isn't documented with a fixed
+    // shape the way the generic error envelope is, so this is deliberately tolerant:
+    // tries the field names the guide's OTHER error shape uses first, and if an element
+    // doesn't match any of them, dumps that element's raw JSON rather than silently
+    // dropping it — seeing something unparsed beats seeing nothing at all.
+    local procedure FormatInvoiceErrors(InvoiceJson: JsonObject): Text
+    var
+        ErrorObj: JsonObject;
+        JTok: JsonToken;
+        ErrorElement: JsonToken;
+        ResultText: Text;
+        PartText: Text;
+        LocationText: Text;
+        RawText: Text;
+    begin
+        if not InvoiceJson.Get('errors', JTok) then
+            exit('');
+        if JTok.IsValue() then
+            if JTok.AsValue().IsNull() then
+                exit('');
+
+        if JTok.IsArray() then begin
+            foreach ErrorElement in JTok.AsArray() do begin
+                Clear(PartText);
+                if ErrorElement.IsObject() then begin
+                    ErrorObj := ErrorElement.AsObject();
+                    PartText := GetJsonText(ErrorObj, 'message');
+                    if PartText = '' then
+                        PartText := GetJsonText(ErrorObj, 'reason');
+                    if PartText = '' then
+                        PartText := GetJsonText(ErrorObj, 'description');
+                    LocationText := GetJsonText(ErrorObj, 'location');
+                    if LocationText = '' then
+                        LocationText := GetJsonText(ErrorObj, 'field');
+                    if PartText = '' then begin
+                        Clear(RawText);
+                        ErrorElement.WriteTo(RawText);
+                        PartText := RawText;
+                    end else
+                        if LocationText <> '' then
+                            PartText := StrSubstNo('%1: %2', LocationText, PartText);
+                end else begin
+                    Clear(RawText);
+                    ErrorElement.WriteTo(RawText);
+                    PartText := RawText;
+                end;
+                ResultText += '\n- ' + PartText;
+            end;
+            exit(ResultText);
+        end;
+
+        JTok.WriteTo(RawText);
+        exit(RawText);
+    end;
+
     // Returns '' for an absent key AND for an explicit JSON null — unlike calling
     // JsonValue.AsText() directly on a null token, whose return value for null isn't
     // something this codebase was able to verify is a clean empty string (the
@@ -621,8 +929,15 @@ codeunit 51105 "Sales E-Receipt API"
     var
         JTok: JsonToken;
     begin
-        if Obj.Get(KeyName, JTok) and JTok.IsValue() and not JTok.AsValue().IsNull() then
-            exit(JTok.AsValue().AsText());
+        // AL does NOT short-circuit "and" — every term in a compound condition is always
+        // evaluated, so "X and Y.AsValue()" calls AsValue() even when X is false. Nested
+        // ifs are the only way to actually guard a converting call like AsValue()/
+        // AsObject()/AsArray(). (Root cause of a real "Unable to convert ... NavJsonToken
+        // to NavJsonValue" crash on a REJECTED invoice whose fields weren't plain values.)
+        if Obj.Get(KeyName, JTok) then
+            if JTok.IsValue() then
+                if not JTok.AsValue().IsNull() then
+                    exit(JTok.AsValue().AsText());
         exit('');
     end;
 
@@ -654,14 +969,15 @@ codeunit 51105 "Sales E-Receipt API"
         end;
     end;
 
-    // Confirmed working via a real Postman/curl test: GET with an x-api-key header (no
-    // Accept header forced) returns 200 with JSON print data — NOT an HTML page. The
-    // query string in that working test was literally "?=<size>" (an empty parameter
-    // name), matched here exactly rather than "?paper=<size>" as the guide text implied,
-    // since the proven request is more trustworthy than the written doc.
+    // GET .../print?paper=<size> — confirmed via a real Postman/curl test (X-API-Key
+    // header, no Accept header forced) to return 200 JSON print data by default, and the
+    // full integration guide's own example (?format=html&paper=a4) confirms "paper" is
+    // the real parameter name. An earlier version used an empty parameter name ("?=") per
+    // an ambiguous one-off test result; the guide is the more trustworthy source now that
+    // it's actually been shared in full.
     local procedure PrintPageUrl(EReceiptSetup: Record "E-Receipt Setup"; InvoiceId: Text): Text
     begin
-        exit(EReceiptSetup."Base URL" + '/v1/invoices/' + InvoiceId + '/print?=' + PaperSizeQueryValue(EReceiptSetup."Paper Size"));
+        exit(EReceiptSetup."Base URL" + '/v1/invoices/' + InvoiceId + '/print?paper=' + PaperSizeQueryValue(EReceiptSetup."Paper Size"));
     end;
 
     // Fetches MoR's own real, ready-made PDF (?format=pdf&paper=<size>) — confirmed via a
@@ -755,6 +1071,9 @@ codeunit 51105 "Sales E-Receipt API"
         BuyerIdLabel: Text;
         LineDiscountText: Text;
         LineRowsHtml: Text;
+        IncomeWithholdingAmt: Decimal;
+        SubtotalAmt: Decimal;
+        WithholdingPct: Decimal;
         HtmlDoc: TextBuilder;
         HtmlBlob: Codeunit "Temp Blob";
         HtmlOutStr: OutStream;
@@ -886,6 +1205,15 @@ codeunit 51105 "Sales E-Receipt API"
             Format(GetJsonDecimal(TotalsJson, 'subtotal'), 0, '<Precision,2:2><Sign><Integer Thousand><Decimals>')));
         HtmlDoc.Append(StrSubstNo('<tr><td>Tax</td><td class="r">%1</td></tr>',
             Format(GetJsonDecimal(TotalsJson, 'tax'), 0, '<Precision,2:2><Sign><Integer Thousand><Decimals>')));
+        IncomeWithholdingAmt := GetJsonDecimal(TotalsJson, 'incomeWithholding');
+        if IncomeWithholdingAmt > 0 then begin
+            SubtotalAmt := GetJsonDecimal(TotalsJson, 'subtotal');
+            if SubtotalAmt <> 0 then
+                WithholdingPct := Round(IncomeWithholdingAmt / SubtotalAmt * 100, 0.01);
+            HtmlDoc.Append(StrSubstNo('<tr><td>Withholding (%1%%)</td><td class="r">-%2</td></tr>',
+                Format(WithholdingPct, 0, '<Precision,2:2><Integer><Decimals>'),
+                Format(IncomeWithholdingAmt, 0, '<Precision,2:2><Sign><Integer Thousand><Decimals>')));
+        end;
         HtmlDoc.Append(StrSubstNo('<tr class="tot"><td>Total (%1)</td><td class="r">%2</td></tr>',
             HtmlEncode(GetJsonText(TotalsJson, 'currency')),
             Format(GetJsonDecimal(TotalsJson, 'total'), 0, '<Precision,2:2><Sign><Integer Thousand><Decimals>')));
@@ -961,11 +1289,12 @@ codeunit 51105 "Sales E-Receipt API"
             exit('');
         AddrArr := JTok.AsArray();
         foreach Element in AddrArr do begin
-            if Element.IsValue() and not Element.AsValue().IsNull() then begin
-                if ResultText <> '' then
-                    ResultText += ', ';
-                ResultText += Element.AsValue().AsText();
-            end;
+            if Element.IsValue() then
+                if not Element.AsValue().IsNull() then begin
+                    if ResultText <> '' then
+                        ResultText += ', ';
+                    ResultText += Element.AsValue().AsText();
+                end;
         end;
         exit(ResultText);
     end;
@@ -974,8 +1303,10 @@ codeunit 51105 "Sales E-Receipt API"
     var
         JTok: JsonToken;
     begin
-        if Obj.Get(KeyName, JTok) and JTok.IsValue() and not JTok.AsValue().IsNull() then
-            exit(JTok.AsValue().AsDecimal());
+        if Obj.Get(KeyName, JTok) then
+            if JTok.IsValue() then
+                if not JTok.AsValue().IsNull() then
+                    exit(JTok.AsValue().AsDecimal());
         exit(0);
     end;
 

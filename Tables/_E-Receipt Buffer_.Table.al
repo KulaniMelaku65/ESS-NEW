@@ -174,6 +174,48 @@ table 51103 "E-Receipt Buffer"
         {
             Caption = 'Receipt Counter';
         }
+        field(72; "Line Withholding %"; Decimal)
+        {
+            Caption = 'Line Withholding %';
+        }
+        field(73; "Line Withholding Amount"; Decimal)
+        {
+            Caption = 'Line Withholding Amount';
+            AutoFormatType = 1;
+        }
+        field(74; "Total Withholding Amount"; Decimal)
+        {
+            Caption = 'Total Withholding Amount';
+            AutoFormatType = 1;
+            // Repeated on every row like the other header-level totals (Total Excl. VAT
+            // etc.) — the sum across all lines, not this one line's own withholding.
+        }
+        field(75; "Total Withheld PreTax Amount"; Decimal)
+        {
+            Caption = 'Total Withheld PreTax Amount';
+            AutoFormatType = 1;
+            // Sum of "Line Amount" for only the lines withholding was actually applied
+            // to (not the whole invoice) — this is the "preTaxAmount" the guide's
+            // POST /v1/receipts/withholding call expects alongside "withholdingAmount".
+        }
+        field(76; "Line Excise %"; Decimal)
+        {
+            Caption = 'Line Excise %';
+        }
+        field(77; "Line Excise Amount"; Decimal)
+        {
+            Caption = 'Line Excise Amount';
+            AutoFormatType = 1;
+            // Calculated on the pre-discount Line Total (Quantity x Unit Price excl. VAT),
+            // per the EIMS tax calc reference: discounts never reduce the excise base.
+        }
+        field(78; "Total Excise Amount"; Decimal)
+        {
+            Caption = 'Total Excise Amount';
+            AutoFormatType = 1;
+            // Repeated on every row like the other header-level totals — sum across all
+            // lines, not this one line's own excise.
+        }
     }
 
     keys

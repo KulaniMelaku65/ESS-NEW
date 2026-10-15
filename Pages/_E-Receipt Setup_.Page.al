@@ -37,7 +37,7 @@ page 51119 "E-Receipt Setup"
                 field("Next Receipt Counter"; Rec."Next Receipt Counter")
                 {
                     ApplicationArea = All;
-                    ToolTip = 'Specifies the receipt counter to use on the next e-receipt sent — advances by one automatically after each send. Only change this if the middleware team tells you to start from a different number.';
+                    ToolTip = 'Specifies the counter to use on the next receipt sent to MoR — shared across every receipt type (invoice payment, credit-sale, withholding), advances by one automatically after each one. Only change this if the middleware team tells you to start from a different number.';
                 }
                 field("Paper Size"; Rec."Paper Size")
                 {

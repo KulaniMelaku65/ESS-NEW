@@ -48,5 +48,18 @@ tableextension 51111 "Sales Header TIN" extends "Sales Header"
             DataClassification = SystemMetadata;
             Editable = false;
         }
+        field(51104; "Total Withholding Amount"; Decimal)
+        {
+            Caption = 'Total Withholding Amount';
+            Editable = false;
+            FieldClass = FlowField;
+            // Excludes G/L Account lines — this business uses those to manually book
+            // withholding in its existing flow, which "Apply Withholding" on the real
+            // item/service lines now replaces; including them would double-count and,
+            // more importantly, would disagree with codeunit 51105's own total (computed
+            // from the exact same Item/Resource line set actually sent to MoR).
+            CalcFormula = sum("Sales Line"."Withholding Amount" where("Document Type" = field("Document Type"), "Document No." = field("No."), Type = filter(<> "G/L Account")));
+            AutoFormatType = 1;
+        }
     }
 }
