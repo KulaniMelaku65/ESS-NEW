@@ -56,20 +56,21 @@ codeunit 51105 "Sales E-Receipt API"
     // receipt" (a separate action) builds .../v1/invoices/{id}/print the same way, using
     // "E-Receipt Invoice ID" captured once the invoice registers.
     //
-    // Withholding (per the guide's "Withholding" section): chosen on a per-line basis on
-    // the Sales Line itself ("Apply Withholding" + "Withholding Code", see TableExt
-    // "Sales Line Withholding" and table "Withholding Setup"), never automatic by
-    // customer. Income withholding (not transaction) per instruction — sent as
-    // values.incomeWithholdValue on the issue payload (BuildPayload), then filed
-    // separately via POST /v1/receipts/withholding (SubmitWithholdingReceipt, type
-    // "IWHT" — the guide's own example only shows "TWHT"; "IWHT" is this codeunit's
-    // extrapolation for the income-withholding counterpart, not independently
-    // confirmed). Its receiptCounter is the SAME shared sequence as every other
-    // receipt-generating call (GetNextReceiptCounter) — confirmed by the guide's own
-    // examples showing 123/124/125 used sequentially across an issue call, a
-    // credit-sale receipt, and a withholding receipt, not separate per-type counters.
-    // Basis is each line's pre-tax Amount, matching the receipt payload's own
-    // "preTaxAmount" field name.
+    // Withholding: chosen on a per-line basis on the Sales Line itself ("Apply
+    // Withholding" + "Withholding Code", see TableExt "Sales Line Withholding" and table
+    // "Withholding Setup"), never automatic by customer. Sent as values.incomeWithholdValue
+    // on the issue payload (BuildPayload) — DISPLAY-ONLY on this invoice, never subtracted
+    // from the total.
+    //
+    // This codeunit does NOT, and must NOT, call POST /v1/receipts/withholding. That was
+    // tried (type "IWHT", an unconfirmed extrapolation from the guide's "TWHT"-only
+    // example) and removed after a real HTTP 400 proved the assumption wrong:
+    // "IRN is a sale by <sellerTin>; the buyer (<buyerTin>) files the withholding receipt
+    // as withholding agent, not the seller." Filing that receipt is the BUYER's
+    // responsibility when they are a registered withholding agent, never the seller's —
+    // this ERP is always the seller side of the invoices it issues, so there is no
+    // scenario where this codeunit should be making that call. The invoice itself still
+    // registers successfully regardless; only the (wrongly-attempted) second call failed.
 
     // Fetches MoR's own print DATA (confirmed via a real Postman test: GET with X-API-Key,
     // no forced Accept header, returns 200 JSON — not HTML/PDF as earlier assumed) and
@@ -198,12 +199,6 @@ codeunit 51105 "Sales E-Receipt API"
         if not HandleResponse(SalesHeader, EReceiptBuffer, ResponseText) then
             exit;
 
-        // Per the guide's Withholding section: file the withholding receipt against the
-        // IRN before printing, so the printed invoice reflects the net payable.
-        EReceiptBuffer.Reset();
-        if EReceiptBuffer.FindFirst() and (EReceiptBuffer."Total Withholding Amount" > 0) then
-            SubmitWithholdingReceipt(EReceiptSetup, Client, EReceiptBuffer);
-
         if FetchAndDownloadPdf(EReceiptSetup, Client, SalesHeader."E-Receipt Invoice ID", SalesHeader."No.") then
             exit;
         if not FetchAndShowPrintReport(EReceiptSetup, Client, SalesHeader) then
@@ -295,7 +290,6 @@ codeunit 51105 "Sales E-Receipt API"
         InvoiceDiscountPct: Decimal;
         UnitPriceExclVat: Decimal;
         LineDiscount: Decimal;
-        TotalWithheldPreTax: Decimal;
         TotalWithholding: Decimal;
         LineWithholdingAmount: Decimal;
         LineExcisePct: Decimal;
@@ -429,10 +423,8 @@ codeunit 51105 "Sales E-Receipt API"
                 EReceiptBuffer."Line Withholding Amount" := LineWithholdingAmount;
                 EReceiptBuffer."Line Excise %" := LineExcisePct;
                 EReceiptBuffer."Line Excise Amount" := LineExciseAmount;
-                if SalesLine."Apply Withholding" then begin
-                    TotalWithheldPreTax += SalesLine.Amount;
+                if SalesLine."Apply Withholding" then
                     TotalWithholding += LineWithholdingAmount;
-                end;
                 EReceiptBuffer.Insert();
             until SalesLine.Next() = 0;
 
@@ -472,7 +464,6 @@ codeunit 51105 "Sales E-Receipt API"
         EReceiptBuffer.Reset();
         if EReceiptBuffer.FindSet(true) then
             repeat
-                EReceiptBuffer."Total Withheld PreTax Amount" := TotalWithheldPreTax;
                 EReceiptBuffer."Total Withholding Amount" := TotalWithholding;
                 EReceiptBuffer."Total Excise Amount" := TotalExciseAmount;
                 EReceiptBuffer.Modify();
@@ -766,63 +757,6 @@ codeunit 51105 "Sales E-Receipt API"
             until EReceiptBuffer.Next() = 0;
 
         exit(true);
-    end;
-
-    // POST /v1/receipts/withholding, per the guide's Withholding section: a SEPARATE call
-    // from the invoice issue, filed against the already-registered invoice's own IRN, with
-    // its own receiptNumber/receiptCounter sequence (not the invoice's own receipt
-    // counter). Failure here doesn't roll back the invoice registration itself — it's
-    // already filed with MoR by this point — so this only messages the user rather than
-    // exiting the whole SendEReceipt flow.
-    local procedure SubmitWithholdingReceipt(EReceiptSetup: Record "E-Receipt Setup"; var Client: HttpClient; var EReceiptBuffer: Record "E-Receipt Buffer" temporary)
-    var
-        Content: HttpContent;
-        ContentHeaders: HttpHeaders;
-        Response: HttpResponseMessage;
-        ResponseText: Text;
-        Payload: JsonObject;
-        PayloadText: Text;
-        Url: Text;
-        ReceiptCounter: Integer;
-        ReceiptNumberText: Text[30];
-    begin
-        // Shares the SAME counter sequence as the invoice's own receipt and any
-        // credit-sale receipts — confirmed by the guide's own examples (123, 124, 125
-        // used sequentially across an issue call, a credit-sale receipt, and a
-        // withholding receipt). NOT a separate per-type counter.
-        ReceiptCounter := EReceiptSetup.GetNextReceiptCounter();
-        ReceiptNumberText := CopyStr(StrSubstNo('WHT-%1-%2', EReceiptBuffer."Document No.", ReceiptCounter), 1, 30);
-
-        Payload.Add('receiptNumber', ReceiptNumberText);
-        Payload.Add('receiptCounter', Format(ReceiptCounter));
-        Payload.Add('reason', CopyStr(StrSubstNo('Withholding on %1', EReceiptBuffer."Document No."), 1, 100));
-        Payload.Add('sourceSystemType', EReceiptSetup."System Type");
-        Payload.Add('sourceSystemNumber', EReceiptSetup."System Number");
-        Payload.Add('irn', EReceiptBuffer.IRN);
-        Payload.Add('currency', 'ETB');
-        Payload.Add('type', 'IWHT');
-        Payload.Add('preTaxAmount', EReceiptBuffer."Total Withheld PreTax Amount");
-        Payload.Add('withholdingAmount', EReceiptBuffer."Total Withholding Amount");
-        Payload.WriteTo(PayloadText);
-
-        Content.WriteFrom(PayloadText);
-        Content.GetHeaders(ContentHeaders);
-        ContentHeaders.Clear();
-        ContentHeaders.Add('Content-Type', 'application/json');
-
-        if not Client.DefaultRequestHeaders().Contains('X-API-Key') then
-            Client.DefaultRequestHeaders().Add('X-API-Key', EReceiptSetup."API Key");
-
-        Url := EReceiptSetup."Base URL" + '/v1/receipts/withholding';
-        if not Client.Post(Url, Content, Response) then begin
-            Message('Invoice %1 is registered, but the withholding receipt could not be submitted (network/timeout).', EReceiptBuffer."Document No.");
-            exit;
-        end;
-        Response.Content().ReadAs(ResponseText);
-        if not Response.IsSuccessStatusCode() then
-            // Same generic error envelope as the issue call's own 422 (traceId/code/title/
-            // message/errors) — formatted readably instead of dumping the raw JSON.
-            Message('Invoice %1 is registered, but the withholding receipt returned HTTP %2.\n%3', EReceiptBuffer."Document No.", Response.HttpStatusCode(), FormatGenericError(ResponseText));
     end;
 
     local procedure HasDataField(ResponseText: Text): Boolean

@@ -190,14 +190,6 @@ table 51103 "E-Receipt Buffer"
             // Repeated on every row like the other header-level totals (Total Excl. VAT
             // etc.) — the sum across all lines, not this one line's own withholding.
         }
-        field(75; "Total Withheld PreTax Amount"; Decimal)
-        {
-            Caption = 'Total Withheld PreTax Amount';
-            AutoFormatType = 1;
-            // Sum of "Line Amount" for only the lines withholding was actually applied
-            // to (not the whole invoice) — this is the "preTaxAmount" the guide's
-            // POST /v1/receipts/withholding call expects alongside "withholdingAmount".
-        }
         field(76; "Line Excise %"; Decimal)
         {
             Caption = 'Line Excise %';
