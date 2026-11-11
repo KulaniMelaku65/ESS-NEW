@@ -1,4 +1,3 @@
-// --- Page: Subform (The Grid) ---
 page 51101 "Monthly Timesheet Subform"
 {
     PageType = ListPart;
@@ -15,18 +14,30 @@ page 51101 "Monthly Timesheet Subform"
         {
             repeater(Group)
             {
-                field("Work Date"; Rec."Work Date") { ApplicationArea = All; }
+                field("Work Date";Rec."Work Date")
+                {
+                    ApplicationArea = All;
+                }
                 //field("Job No."; Rec."Job No.") { ApplicationArea = All; }
-                field("Description"; Rec."Activity") { ApplicationArea = All; }
-
-
+                field("Description";Rec."Activity")
+                {
+                    ApplicationArea = All;
+                }
                 // Shift Breakdown
-                field("Morning Hours"; Rec."Morning Hours") { ApplicationArea = All; }
-                field("Afternoon Hours"; Rec."Afternoon Hours") { ApplicationArea = All; }
-                field(Notes; Rec.Notes) { ApplicationArea = All; }
-
+                field("Morning Hours";Rec."Morning Hours")
+                {
+                    ApplicationArea = All;
+                }
+                field("Afternoon Hours";Rec."Afternoon Hours")
+                {
+                    ApplicationArea = All;
+                }
+                field(Notes;Rec.Notes)
+                {
+                    ApplicationArea = All;
+                }
                 // Final calculation for that specific row
-                field("Daily Total"; Rec."Daily Total")
+                field("Daily Total";Rec."Daily Total")
                 {
                     ApplicationArea = All;
                     Style = Strong; // Makes it stand out
@@ -34,6 +45,4 @@ page 51101 "Monthly Timesheet Subform"
             }
         }
     }
-   
-
 }

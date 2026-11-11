@@ -118,6 +118,7 @@ codeunit 51102 "Web Portal HR Ext"
     NotificationType: Enum "Notification Type HR";
     i: Integer;
     NoDatesErr: Label 'At least one leave date is required.';
+    InsufficientBalanceErr: Label '%1 days applied for %2 cannot be more than the available balance of %3 days.';
     begin
         if(NoOfDates < 1) or(NoOfDates > ArrayLen(LeaveDates))then Error(NoDatesErr);
 
@@ -156,6 +157,24 @@ codeunit 51102 "Web Portal HR Ext"
         // calculator-derived totals with those stale zeros — which is
         // exactly what was landing in the header and the Leave Reminder email.
         LeaveApplication.Get(AppNo);
+
+        // The base app's own balance check (Tab "Leave Application",
+        // OnValidate("Start Date")) never runs for a multi-day submission —
+        // there's no single Start Date to validate against up front, it's
+        // derived from the day lines above. Without this, an employee with no
+        // balance for this leave type (e.g. an "Internship" Employee Type,
+        // which Annual Leave Accrual (codeunit 51145) never credits since it
+        // only accrues where "Annual Leave Entitlement" > 0) could still get a
+        // request approved with nothing backing it. Rolled back rather than
+        // left sitting as an orphan Open record — safe to delete here since
+        // Status is still Open at this point (OnDelete only blocks past Open).
+        LeaveApplication.CalcFields("Leave Balance");
+        if LeaveApplication."No. of Days" > LeaveApplication."Leave Balance" then begin
+            LeaveDay.SetRange("Leave No.", AppNo);
+            LeaveDay.DeleteAll(true);
+            LeaveApplication.Delete(true);
+            Error(InsufficientBalanceErr, LeaveApplication."No. of Days", LeaveTypeCode, LeaveApplication."Leave Balance");
+        end;
 
         if LeaveApplication."Team Lead" then begin
             if ApprovalsMgmt.CheckLeaveApplicationApprovalsWorkflowEnabled(LeaveApplication)then ApprovalsMgmt.OnSendLeaveApplicationForApproval(LeaveApplication);

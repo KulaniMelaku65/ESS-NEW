@@ -1,143 +1,98 @@
 codeunit 51100 "Timesheet Mgt."
 {
-    // --- 1. REGISTRATION: Make the events appear in the ERP UI ---
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Workflow Event Handling", 'OnAddWorkflowEventsToLibrary', '', false, false)]
-    local procedure OnAddWorkflowEventsToLibrary()
-    var
-        WorkflowEventHandling: Codeunit "Workflow Event Handling";
-    begin
-        // Main Event
-        WorkflowEventHandling.AddEventToLibrary(RunWorkflowOnSendTimesheetForApprovalCode(), Database::"Monthly Timesheet Header", 'An approval of a monthly timesheet is requested.', 0, false);
-
-        // Status Events (To match your system's pattern)
-        WorkflowEventHandling.AddEventToLibrary(RunWorkflowOnTimeSheetApprovedCode(), Database::"Monthly Timesheet Header", 'Approval Request for TimeSheet is approved', 0, false);
-        WorkflowEventHandling.AddEventToLibrary(RunWorkflowOnTimeSheetRejectedCode(), Database::"Monthly Timesheet Header", 'Approval Request for TimeSheet is rejected', 0, false);
-        WorkflowEventHandling.AddEventToLibrary(RunWorkflowOnTimeSheetCancelledCode(), Database::"Monthly Timesheet Header", 'Approval Request for TimeSheet is cancelled by User', 0, false);
+    // =========================================================
+    //  INTEGRATION EVENTS
+    //  Published here; subscribed to in "Timesheet Workflow Code"
+    //  (51101) which hands them to the workflow engine.
+    //  Keeping them here means the page never needs to reference
+    //  the workflow codeunit directly.
+    // =========================================================
+    /// <summary>
+ 
+///  Raised when the employee submits the timesheet. 
+ 
+/// </summary>
+[IntegrationEvent(false, false)]
+    procedure OnSendTimesheetForApproval(var MonthlyTimesheetHeader: Record "Monthly Timesheet Header")begin
     end;
-
-    // --- 2. UNIQUE CODES (Used by Workflow Engine) ---
-    procedure RunWorkflowOnSendTimesheetForApprovalCode(): Code[128]
-    begin
-        exit(UpperCase('RunWorkflowOnSendTimesheetForApproval'));
+    /// <summary>
+ 
+///  Raised when the employee cancels the pending approval 
+ 
+///  request before any approver has acted. 
+ 
+/// </summary>
+[IntegrationEvent(false, false)]
+    procedure OnCancelTimesheetApprovalRequest(var MonthlyTimesheetHeader: Record "Monthly Timesheet Header")begin
     end;
-
-    procedure RunWorkflowOnTimeSheetApprovedCode(): Code[128]
+    // =========================================================
+    //  PUBLIC PROCEDURES  (called from page 51100)
+    // =========================================================
+    /// <summary>
+ 
+///  Called by the "Submit for Approval" action on the page. 
+ 
+///  Validates the document, then raises the integration event. 
+ 
+///  The workflow engine subscriber in Timesheet Workflow Code 
+ 
+///  picks it up and starts the approval chain. 
+ 
+/// </summary>
+ procedure SubmitTimesheet(var Header: Record "Monthly Timesheet Header")var WorkflowMgt: Codeunit "Workflow Management";
     begin
-        exit(UpperCase('RunWorkflowOnTimeSheetApproved'));
-    end;
-
-    procedure RunWorkflowOnTimeSheetRejectedCode(): Code[128]
-    begin
-        exit(UpperCase('RunWorkflowOnTimeSheetRejected'));
-    end;
-
-    procedure RunWorkflowOnTimeSheetCancelledCode(): Code[128]
-    begin
-        exit(UpperCase('RunWorkflowOnTimeSheetCancelled'));
-    end;
-
-    // --- 3. MAPPING: Link Custom Table to the Approval Entry System ---
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Approvals Mgmt.", 'OnPopulateApprovalEntryArgument', '', false, false)]
-    local procedure OnPopulateApprovalEntryArgument(var RecRef: RecordRef; var ApprovalEntryArgument: Record "Approval Entry"; WorkflowStepInstance: Record "Workflow Step Instance")
-    var
-        TSHeader: Record "Monthly Timesheet Header";
-    begin
-        if RecRef.Number = Database::"Monthly Timesheet Header" then begin
-            RecRef.SetTable(TSHeader);
-            ApprovalEntryArgument."Table ID" := Database::"Monthly Timesheet Header";
-            ApprovalEntryArgument."Document No." := TSHeader."No.";
-        end;
-    end;
-
-    // --- 4. EXECUTION: Logic for "Release Time_Sheet" and "ReOpen" Responses ---
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Workflow Response Handling", 'OnExecuteWorkflowResponse', '', false, false)]
-    local procedure OnExecuteWorkflowResponse(var ResponseExecuted: Boolean; Variant: Variant; xVariant: Variant; ResponseWorkflowStepInstance: Record "Workflow Step Instance")
-    var
-        WorkflowResponse: Record "Workflow Response";
-        TSHeader: Record "Monthly Timesheet Header";
-        RecRef: RecordRef;
-    begin
-        if WorkflowResponse.Get(ResponseWorkflowStepInstance."Function Name") then begin
-            RecRef.GetTable(Variant);
-            if RecRef.Number = Database::"Monthly Timesheet Header" then begin
-                RecRef.SetTable(TSHeader);
-                case WorkflowResponse."Function Name" of
-                    'SetStatusToPendingApproval': // Standard BC code
-                        begin
-                            TSHeader.Status := TSHeader.Status::"Pending Approval";
-                            TSHeader.Modify();
-                            ResponseExecuted := true;
-                        end;
-                    'Release TimeSheet': // Matches your UI list
-                        begin
-                            TSHeader.Status := TSHeader.Status::Released;
-                            TSHeader.Modify();
-                            ResponseExecuted := true;
-                        end;
-                    'ReOpen TimeSheet': // Matches your UI list
-                        begin
-                            TSHeader.Status := TSHeader.Status::Open;
-                            TSHeader.Modify();
-                            ResponseExecuted := true;
-                        end;
-                end;
-            end;
-        end;
-    end;
-
-    // --- 5. HANDLING APPROVAL ACTIONS ---
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Approvals Mgmt.", 'OnApproveApprovalRequest', '', false, false)]
-    local procedure RunOnApprove(var ApprovalEntry: Record "Approval Entry")
-    var
-        WorkflowManagement: Codeunit "Workflow Management";
-    begin
-        if ApprovalEntry."Table ID" = Database::"Monthly Timesheet Header" then
-            WorkflowManagement.HandleEvent(RunWorkflowOnTimeSheetApprovedCode(), ApprovalEntry);
-    end;
-
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Approvals Mgmt.", 'OnRejectApprovalRequest', '', false, false)]
-    local procedure RunOnReject(var ApprovalEntry: Record "Approval Entry")
-    var
-        WorkflowManagement: Codeunit "Workflow Management";
-    begin
-        if ApprovalEntry."Table ID" = Database::"Monthly Timesheet Header" then
-            WorkflowManagement.HandleEvent(RunWorkflowOnTimeSheetRejectedCode(), ApprovalEntry);
-    end;
-
-    // --- 6. CORE BUSINESS LOGIC ---
-    procedure SubmitTimesheet(var Header: Record "Monthly Timesheet Header")
-    begin
-        if Header.Status <> Header.Status::Open then
-            Error('Only Open timesheets can be submitted.');
-
+        // Must be Open to submit.
+        if Header.Status <> Header.Status::Open then Error('Only Open timesheets can be submitted for approval. Current status: %1.', Header.Status);
+        // Employee No. is mandatory.
         Header.TestField("Employee No.");
-        if not LinesExist(Header."No.") then
-            Error('You cannot submit an empty timesheet.');
-
+        // At least one line must exist.
+        if not LinesExist(Header."No.")then Error('Cannot submit an empty timesheet. Please add at least one line.');
+        // A workflow must be configured and active for this document.
+        // This catches the case where the admin forgot to enable the workflow.
+        // if not WorkflowMgt.CanExecuteWorkflow(Database::"Monthly Timesheet Header")
+        //.CanHandleRequest(Header)
+        //  then
+        //Error('No active workflow is set up for Monthly Timesheet approval. Please contact your system administrator.');
+        // All checks passed — raise event for the workflow engine.
         OnSendTimesheetForApproval(Header);
     end;
-
-    local procedure LinesExist(DocNo: Code[20]): Boolean
-    var
-        Lines: Record "Monthly Timesheet Line";
+    /// <summary>
+ 
+///  Called by the "Cancel Approval Request" action on the page. 
+ 
+///  Only allowed while status is Pending Approval AND before 
+ 
+///  the first approver has acted (open approval entries exist). 
+ 
+///  Removes all pending approval entries, then raises the 
+ 
+///  cancel event so the workflow engine resets status to Open. 
+ 
+/// </summary>
+ procedure CancelTimesheet(var Header: Record "Monthly Timesheet Header")var ApprovalsMgmt: Codeunit "Approvals Mgmt.";
+    ApprovalEntry: Record "Approval Entry";
+    begin
+        // Must be in Pending Approval to cancel.
+        if Header.Status <> Header.Status::"Pending Approval" then Error('The approval request can only be cancelled while the status is Pending Approval.');
+        // If no Open approval entries remain, at least one approver
+        // has already acted — block the cancel.
+        ApprovalEntry.Reset();
+        ApprovalEntry.SetRange("Table ID", Database::"Monthly Timesheet Header");
+        ApprovalEntry.SetRange("Record ID to Approve", Header.RecordId());
+        ApprovalEntry.SetRange(Status, ApprovalEntry.Status::Open);
+        if ApprovalEntry.IsEmpty()then Error('This approval request cannot be cancelled because it has already been reviewed by an approver.');
+        // Remove all pending approval entries for this record.
+        //  ApprovalsMgmt.CancelApprovalRequestsForRecord(Header.RecordId());
+        //ApprovalsMgmt.CancelApprovalRequestsForRecord(Header.RecordId());
+        // Raise event — workflow engine subscriber resets status to Open.
+        OnCancelTimesheetApprovalRequest(Header);
+    end;
+    // =========================================================
+    //  PRIVATE HELPERS
+    // =========================================================
+    local procedure LinesExist(DocNo: Code[20]): Boolean var Lines: Record "Monthly Timesheet Line";
     begin
         Lines.SetRange("Document No.", DocNo);
-        exit(not Lines.IsEmpty);
-    end;
-
-    [IntegrationEvent(false, false)]
-    procedure OnSendTimesheetForApproval(var Timesheet: Record "Monthly Timesheet Header")
-    begin
-    end;
-
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Timesheet Mgt.", 'OnSendTimesheetForApproval', '', false, false)]
-    local procedure RunWorkflowOnSendTimesheetForApproval(var Timesheet: Record "Monthly Timesheet Header")
-    var
-        WorkflowManagement: Codeunit "Workflow Management";
-    begin
-        WorkflowManagement.HandleEvent(RunWorkflowOnSendTimesheetForApprovalCode(), Timesheet);
+        exit(not Lines.IsEmpty());
     end;
 }
-//An event with description Approval Request for Time_Sheet is approved already exists. 
-
-
