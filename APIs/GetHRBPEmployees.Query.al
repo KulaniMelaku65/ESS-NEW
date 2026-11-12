@@ -35,9 +35,10 @@ query 51103 GetHRBPEmployees
             {
                 DataItemLink = "HRBP No." = hrbp."No.";
                 SqlJoinType = InnerJoin;
-                // Only active employees are linked to their HRBP. If an HRBP's
-                // employees are all inactive, the HRBP drops out (InnerJoin).
-                DataItemTableFilter = "Employee Status" = const(Active);
+                // Only active employees, at the head office, are linked to their
+                // HRBP here. If an HRBP's employees are all inactive or outside
+                // "Addis Ababa - HQ", the HRBP drops out (InnerJoin).
+                DataItemTableFilter = "Employee Status" = const(Active), "Employee Location" = const('Addis Ababa - HQ');
                 column(employeeNo; "No.")
                 {
                     Caption = 'EmployeeNo';
