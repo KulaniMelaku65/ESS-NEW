@@ -32,6 +32,8 @@ codeunit 51147 "New Employee Approval Guard"
         // this is > 0) — 0/blank here is correct for them, not an omission.
         if Employee."Employee Type" = Employee."Employee Type"::Internship then
             exit;
+        if Employee."Employee Type" = Employee."Employee Type"::Contract then
+            exit;
         if Employee."Annual Leave Entitlement" <= 0 then
             Error(EntitlementErr, Employee.FullName());
     end;
